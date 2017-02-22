@@ -23,10 +23,10 @@ import java.util.List;
 @ConditionalOnBean(TenantInfoHolder.class)
 public class ApplicationConfig {
 
-    @Bean
-    public DataSource dataSource(@Qualifier("tenantIdentityHolder") TenantInfoHolder tenantInfoHolder) {
-        return new TenantAwareDataSource(tenantInfoHolder);
-    }
+//    @Bean
+//    public DataSource dataSource(@Qualifier("tenantIdentityHolder") TenantInfoHolder tenantInfoHolder) {
+//        return new TenantAwareDataSource(tenantInfoHolder);
+//    }
 
 //    @Bean
 //    public ProcessEngineConfigurationConfigurer multiTenantProcessingEngineConfigurer() {
@@ -41,10 +41,10 @@ public class ApplicationConfig {
 //        };
 //    }
 
-    @Bean
-    public DataSourceTransactionManager transactionManager(DataSource dataSource) {
-        return new DataSourceTransactionManager(dataSource);
-    }
+//    @Bean
+//    public DataSourceTransactionManager transactionManager(DataSource dataSource) {
+//        return new DataSourceTransactionManager(dataSource);
+//    }
 
     @Bean(name = "tenants", autowire = Autowire.BY_NAME)
     public List<String> tenants() {

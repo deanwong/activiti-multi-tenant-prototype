@@ -2,6 +2,7 @@ package com.deanwangpro.activiti;
 
 import org.activiti.engine.*;
 import org.activiti.engine.impl.asyncexecutor.multitenant.ExecutorPerTenantAsyncExecutor;
+import org.activiti.engine.impl.cfg.SpringBeanFactoryProxyMap;
 import org.activiti.engine.impl.cfg.multitenant.MultiSchemaMultiTenantProcessEngineConfiguration;
 import org.activiti.engine.impl.cfg.multitenant.TenantAwareDataSource;
 import org.activiti.spring.SpringExpressionManager;
@@ -39,7 +40,7 @@ public class ProcessConfig {
 //    ProcessAuthConfigurator processAuthConfigurator;
 
     @Autowired
-    private ApplicationContext appContext;
+    private ApplicationContext applicationContext;
 
     @Bean
     @DependsOn("tenants")
@@ -55,7 +56,11 @@ public class ProcessConfig {
 
         processEngineConfig.setAsyncExecutor(new ExecutorPerTenantAsyncExecutor(tenantIdentityHolder));
 
-        processEngineConfig.setExpressionManager(new SpringExpressionManager(appContext, null));
+//        processEngineConfig.setExpressionManager(new SpringExpressionManager(appContext, null));
+
+        processEngineConfig.setExpressionManager(new SpringExpressionManager(applicationContext, processEngineConfig.getBeans()));
+        processEngineConfig.setBeans(new SpringBeanFactoryProxyMap(applicationContext));
+
         // processEngineConfig.setDeploymentMode("resource-parent-folder");
 //        processEngineConfig.setConfigurators(Arrays.asList(processAuthConfigurator));
         tenantIdentityHolder.getAllTenants().stream().filter(Objects::nonNull).forEach(tenant ->
