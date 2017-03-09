@@ -5,6 +5,7 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -20,6 +21,10 @@ public class TenantIdentityHolder implements TenantInfoHolder {
     @Override
     public Collection<String> getAllTenants() {
         return tenants;
+    }
+
+    public void addTenant(String tenantId) {
+        tenants.add(tenantId);
     }
 
     @Override

@@ -4,37 +4,55 @@ import org.activiti.engine.*;
 import org.activiti.engine.impl.asyncexecutor.multitenant.ExecutorPerTenantAsyncExecutor;
 import org.activiti.engine.impl.cfg.SpringBeanFactoryProxyMap;
 import org.activiti.engine.impl.cfg.multitenant.MultiSchemaMultiTenantProcessEngineConfiguration;
-import org.activiti.engine.impl.cfg.multitenant.TenantAwareDataSource;
+import org.activiti.engine.impl.cfg.multitenant.TenantInfoHolder;
 import org.activiti.spring.SpringExpressionManager;
 import org.h2.jdbcx.JdbcDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.SimpleDriverDataSource;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
-import static org.springframework.core.Ordered.LOWEST_PRECEDENCE;
 
 /**
  * Created by i311609 on 22/02/2017.
  */
 @Configuration
 //@Order(LOWEST_PRECEDENCE)
+@AutoConfigureAfter(DataSourceAutoConfiguration.class)
+@ConditionalOnBean(TenantInfoHolder.class)
 public class ProcessConfig {
 
     // https://github.com/egovernments/egov-playground
     private static final String BPMN_FILE_CLASSPATH_LOCATION = "classpath:processes/%s/*.bpmn";
     private static final String BPMN20_FILE_CLASSPATH_LOCATION = "classpath:processes/%s/*.bpmn20.xml";
+
+//    @Bean
+//    public ProcessEngineConfigurationConfigurer multiTenantProcessingEngineConfigurer() {
+//        return new ProcessEngineConfigurationConfigurer() {
+//
+//            @Override
+//            public void configure(SpringProcessEngineConfiguration config) {
+//
+//                config.setIdGenerator(new StrongUuidGenerator());
+//
+//            }
+//        };
+//    }
 
 //    @Autowired
 //    ProcessAuthConfigurator processAuthConfigurator;
@@ -43,8 +61,24 @@ public class ProcessConfig {
     private ApplicationContext applicationContext;
 
     @Bean
-    @DependsOn("tenants")
-    MultiSchemaMultiTenantProcessEngineConfiguration processEngineConfiguration(TenantIdentityHolder tenantIdentityHolder) {
+    DataSource dataSource() {
+        SimpleDriverDataSource dataSource = new SimpleDriverDataSource();
+        dataSource.setDriverClass(org.h2.Driver.class);
+        dataSource.setUrl("jdbc:h2:mem:activiti-mt;DB_CLOSE_DELAY=1000");
+        dataSource.setUsername("sa");
+        dataSource.setPassword("");
+        return dataSource;
+    }
+
+    @Bean
+    PlatformTransactionManager transactionManager(DataSource dataSource) {
+        DataSourceTransactionManager transactionManager = new DataSourceTransactionManager();
+        transactionManager.setDataSource(dataSource);
+        return transactionManager;
+    }
+
+    @Deprecated
+    MultiSchemaMultiTenantProcessEngineConfiguration processEngineConfiguration1(TenantIdentityHolder tenantIdentityHolder) {
         MultiSchemaMultiTenantProcessEngineConfiguration processEngineConfig = new MultiSchemaMultiTenantProcessEngineConfiguration(tenantIdentityHolder);
 
 //        processEngineConfig.setDataSource(dataSource);
@@ -78,9 +112,34 @@ public class ProcessConfig {
         return ds;
     }
 
+    @Bean
+    @DependsOn("tenants")
+    SpringMultiTenantProcessEngineConfiguration processEngineConfiguration(TenantIdentityHolder tenantIdentityHolder, DataSource dataSource, PlatformTransactionManager transactionManager) {
+        SpringMultiTenantProcessEngineConfiguration processEngineConfiguration = new SpringMultiTenantProcessEngineConfiguration(tenantIdentityHolder);
+
+        processEngineConfiguration.setDataSource(dataSource);
+        processEngineConfiguration.setTransactionManager(transactionManager);
+        processEngineConfiguration.setDatabaseSchemaUpdate("true");
+        processEngineConfiguration.setJobExecutorActivate(false);
+        processEngineConfiguration.setAsyncExecutorEnabled(true);
+        processEngineConfiguration.setAsyncExecutorActivate(true);
+        processEngineConfiguration.setAsyncExecutor(new ExecutorPerTenantAsyncExecutor(tenantIdentityHolder));
+
+        tenantIdentityHolder.getAllTenants().stream().filter(Objects::nonNull).forEach(tenant ->
+                processEngineConfiguration.registerTenant(tenant)
+        );
+
+        return processEngineConfiguration;
+    }
 
     @Bean
-    ProcessEngine processEngine(MultiSchemaMultiTenantProcessEngineConfiguration processEngineConfiguration,
+    ProcessEngine processEngine(SpringMultiTenantProcessEngineConfiguration processEngineConfiguration) {
+        ProcessEngine processEngine = processEngineConfiguration.buildProcessEngine();
+        return processEngine;
+    }
+
+    @Deprecated
+    ProcessEngine processEngine1(MultiSchemaMultiTenantProcessEngineConfiguration processEngineConfiguration,
                                 TenantIdentityHolder tenantIdentityHolder) throws IOException {
         ProcessEngine processEngine = processEngineConfiguration.buildProcessEngine();
         ResourceFinderUtil resourceResolver = new ResourceFinderUtil();
